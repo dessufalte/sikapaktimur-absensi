@@ -1,0 +1,343 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { collection, onSnapshot, Timestamp } from "firebase/firestore";
+import {
+  handleExportCSV,
+  handlePrintBulanan,
+  handleSetAbsensi,
+  handleDisablePembukuan,
+  handleTutupAbsen
+} from "./_utils/handleEvents";
+import { firestore } from "../lib/firebase";
+import StackedAbsensiChart from "./_component/chart";
+import AbsensiPieChart from "./_component/piechart";
+import KalenderAbsensi from "./_component/cale";
+import { set } from "firebase/database";
+
+export default function View() {
+  const [users, setUsers] = useState([]);
+  const [absensi, setAbsensi] = useState([]);
+  const [allAbsensi, setAllAbsensi] = useState([]);
+  const [filter, setFilter] = useState("minggu");
+  const [pages, setPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [disablePembukuan, setDisablePembukuan] = useState(false);
+  const [currentPageDate, setCurrentPageDate] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}`;
+  });
+  const [statistik, setStatistik] = useState({
+    totalUser: 0,
+    totalHariKerja: 0,
+    totalPotensiAbsen: 0,
+    totalHadir: 0,
+    totalTerlambat: 0,
+    persentaseHadirBulan: 0,
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [userRes, statistikRes, paginationRes, allAbsensiRes] =
+          await Promise.all([
+            fetch("/api/lihat-user"),
+            fetch("/api/statistik"),
+            fetch(`/api/lihat-ab-pg?page=${pages}`),
+            fetch("/api/lihat-absen"),
+          ]);
+
+        const userData = await userRes.json();
+        const statistikData = await statistikRes.json();
+        const paginationData = await paginationRes.json();
+        const allAbsensiData = await allAbsensiRes.json();
+        if (userData.success) setUsers(userData.data);
+        if (statistikData.success) setStatistik(statistikData.data);
+        if (paginationData.success) {
+          setAbsensi(paginationData.data[0]?.data || []);
+          console.log("Absensi Data:", absensi);
+          setCurrentPageDate(paginationData.data[0]?.tanggal || new Date());
+          setTotalPages(paginationData.totalPages);
+        }
+        if (allAbsensiData.success) setAllAbsensi(allAbsensiData.data);
+      } catch (error) {
+        console.error("Gagal fetch data:", error);
+      }
+    };
+
+    fetchData();
+  }, [pages, refreshKey]);
+
+  useEffect(() => {
+    const cek = async () => {
+      const result = await handleDisablePembukuan(allAbsensi, users);
+      console.log("Disable status:", result);
+      setDisablePembukuan(result);
+    };
+
+    cek();
+  }, [allAbsensi, users]);
+
+  const isUserPresent = (userId) => {
+    return absensi.some((item) => String(item.id) === String(userId));
+  };
+
+  const tutupAbsen = async () => {
+  try {
+    const result = await handleTutupAbsen();
+    alert(`✅ ${result.message}`);
+  } catch (err) {
+    alert("❌ Gagal menutup absensi");
+  }
+};
+  return (
+    <main className="p-5 flex flex-col">
+      <section className="grid grid-cols-3-row grid-cols-4 gap-4 mb-6">
+        <div className="card border-l-4 bg-white-500 border-t-[1px] border-t-gray-200 border-r-[1px] border-r-gray-200 text-emerald-500 p-4 shadow-lg rounded-lg">
+          <h1 className="font-bold text-md"></h1>
+          <p className="text-emerald-400">
+            {statistik.persentaseHadirBulan}% Kehadiran
+          </p>
+        </div>
+
+        {/* Terlambat Bulan Ini */}
+        <div className="card bg-white-500 border-t-[1px] border-t-gray-200 border-r-[1px] border-r-gray-200 border-l-4 text-emerald-500 p-4 shadow-lg rounded-lg">
+          <h1 className="font-bold text-md">{statistik.totalTerlambat} Terlambat</h1>
+          <p className="text-emerald-400">Periode: Bulan Ini</p>
+        </div>
+
+        <div className="grid grid-rows-2">
+          <h2 className="text-emerald-600 font-bold mb-2">Filter :</h2>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="shadow-lg border-[1px] border-gray-200 rounded-lg p-2 outline-0 text-black"
+          >
+            <option value="minggu">Per Minggu</option>
+            <option value="bulan">Per Bulan (12 Bulan)</option>
+            <option value="tahun">Per Tahun (10 Tahun)</option>
+          </select>
+        </div>
+      </section>
+
+      <section className="grid lg:grid-cols-4 md:grid-cols-3 gap-4 mb-6">
+        <div className="md:col-span-3 lg:col-span-2 bg-white p-4 text-black  border-[1px] border-gray-200 rounded-lg shadow-lg items-center">
+          <StackedAbsensiChart filter={filter} dataFromApi={allAbsensi} />
+        </div>
+        <div className="md:col-span-2 lg:col-span-1 bg-white p-4 items-center text-black  border-[1px] border-gray-200  rounded-lg shadow-lg">
+          <AbsensiPieChart filter={filter} dataFromApi={allAbsensi} />
+        </div>
+        <div className="md:col-span-1 lg:col-span-1 bg-white p-4 text-black  border-[1px] border-gray-200  rounded-lg shadow-lg">
+          <KalenderAbsensi />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-5 gap-4">
+        <div className="col-span-2 shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
+          <h2 className="text-emerald-600 font-bold mb-2">Data Pengguna</h2>
+          <table className="min-w-full text-sm border-separate border-spacing-0">
+            <thead className="bg-emerald-400">
+              <tr>
+                <th className="px-2 py-1">ID</th>
+                <th className="px-2 py-1">Nama</th>
+                <th className="px-2 py-1">Jabatan</th>
+                <th className="px-2 py-1">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white text-center text-black">
+              {users.map((user) => (
+                <tr key={user.idDoc}>
+                  <td className="border-b px-2 py-1">{user.id}</td>
+                  <td className="border-b px-2 py-1">{user.nama}</td>
+                  <td className="border-b px-2 py-1">{user.jabatan}</td>
+                  <td className="border-b px-2 py-1">
+                    {!isUserPresent(user.id) && (
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowModal(true);
+                        }}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded"
+                      >
+                        Set Kehadiran
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="col-span-3 flex flex-col shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
+          <h2 className="text-emerald-600 font-bold mb-2">
+            Halaman Absensi: {currentPageDate}
+          </h2>
+          <table className="min-w-full text-sm border-separate border-spacing-0 mb-4">
+            <thead className="bg-emerald-400">
+              <tr>
+                <th className="px-2 py-1">ID</th>
+                <th className="px-2 py-1">Nama</th>
+                <th className="px-2 py-1">Status</th>
+                <th className="px-2 py-1">Keterlambatan</th>
+                <th className="px-2 py-1">Jam Masuk</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white text-black">
+              {absensi.map((item) => {
+                const user = users.find(
+                  (u) => String(u.id) === String(item.id)
+                );
+                const jam = item.timestamp ? new Date(item.timestamp) : null;
+                const jamMasuk = jam?.toLocaleString("id-ID") ?? "-";
+
+                const lateText = (() => {
+                  if (!jam) return "-";
+                  const std = new Date(jam);
+                  std.setHours(8, 0, 0, 0);
+                  const selisih = jam.getTime() - std.getTime();
+                  return selisih <= 0
+                    ? "Tepat Waktu"
+                    : `${Math.floor(selisih / 60000)} menit terlambat`;
+                })();
+
+                return (
+                  <tr key={item.idDoc}>
+                    <td className="border-b px-2 py-1">{item.id}</td>
+                    <td className="border-b px-2 py-1">{user?.nama ?? "-"}</td>
+                    <td className="border-b px-2 py-1">{item.status}</td>
+                    <td className="border-b px-2 py-1">{lateText}</td>
+                    <td className="border-b px-2 py-1">{jamMasuk}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="flex justify-between mt-auto">
+            <button
+              onClick={() => setPages((p) => Math.max(1, p - 1))}
+              disabled={pages === 1}
+              className="bg-emerald-500 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              Sebelumnya
+            </button>
+            <span className="text-black self-center">
+              Halaman {pages} dari {totalPages}
+            </span>
+            <button
+              onClick={() => setPages((p) => Math.min(totalPages, p + 1))}
+              disabled={pages === totalPages}
+              className="bg-emerald-500 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              Selanjutnya
+            </button>
+          </div>
+        </div>
+      </section>
+      <div className="flex flex-row p-4 shadow-lg border-[1px] border-gray-100 rounded-2xl text-sm mt-4 gap-2">
+        <button
+          disabled={disablePembukuan}
+          onClick={tutupAbsen}
+          className={`rounded-lg px-4 py-2 text-white ${
+            disablePembukuan
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          Tutup Absensi Hari Ini (Dibuka 17.00)
+        </button>
+        {filter === "bulan" && (
+          <>
+            <button
+              onClick={() => handlePrintBulanan(selectedMonth)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded "
+            >
+              Print
+            </button>
+          </>
+        )}
+        {filter === "bulan" && (
+          <button
+            onClick={() => handleExportCSV(selectedMonth)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded"
+          >
+            Export CSV
+          </button>
+        )}
+        {filter === "bulan" && (
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="border px-3 rounded text-emerald-500"
+          />
+        )}
+      </div>
+      {showModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-black">
+            <h2 className="text-xl font-bold mb-4">
+              Set Kehadiran: {selectedUser.nama}
+            </h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const status = form.status.value;
+
+                console.log("Form status:", status);
+                console.log("Selected user:", selectedUser);
+                console.log("Current page date:", currentPageDate);
+
+                const sukses = await handleSetAbsensi({
+                  userId: selectedUser.id,
+                  status,
+                  tanggal: currentPageDate,
+                });
+
+                if (sukses) {
+                  setShowModal(false);
+                  setSelectedUser(null);
+                  setRefreshKey((prev) => prev + 1);
+                }
+              }}
+            >
+              <label className="block mb-2">
+                Status:
+                <select name="status" className="w-full border p-1 rounded">
+                  <option value="Izin">Izin</option>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Alpha">Alpha</option>
+                </select>
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="bg-gray-300 text-black px-4 py-2 rounded"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="bg-emerald-500 text-white px-4 py-2 rounded"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
