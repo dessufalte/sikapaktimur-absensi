@@ -3,14 +3,15 @@ import { firestoreAdmin } from "@/app/lib/firebaseadmin";
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
+    const tanggal = searchParams.get("tanggal"); // Misalnya "2025-06-27"
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const pageSize = 1; // Selalu 1 hari per halaman
+    const pageSize = 1;
 
-    // Ambil semua dokumen dari koleksi absensi
+    // Ambil semua dokumen absensi
     const snapshot = await firestoreAdmin.collection("absensi").get();
 
-    // Konversi dan siapkan data absensi
-    const data = snapshot.docs.map(doc => {
+    // Siapkan data absensi
+    const data = snapshot.docs.map((doc) => {
       const docData = doc.data();
       const timestampDate = docData.timestamp?.toDate?.();
       return {
@@ -20,23 +21,33 @@ export async function GET(req) {
       };
     });
 
-    // Group berdasarkan tanggal (string YYYY-MM-DD)
+    // Group berdasarkan tanggal
     const groupedByDate = {};
-    data.forEach(item => {
+    data.forEach((item) => {
       if (!item.timestamp) return;
-      const dateStr = item.timestamp.split("T")[0];
+      const dateStr = item.timestamp.split("T")[0]; // YYYY-MM-DD
       if (!groupedByDate[dateStr]) groupedByDate[dateStr] = [];
       groupedByDate[dateStr].push(item);
     });
 
-    // Urutkan tanggal dari terbaru ke terlama
-    const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+    // Jika `tanggal` disediakan → ambil data tanggal itu
+    if (tanggal) {
+      return Response.json({
+        success: true,
+        tanggal,
+        data: groupedByDate[tanggal] || [],
+      });
+    }
 
-    // Ambil 1 hari (group) sesuai halaman
+    // Kalau tidak, gunakan pagination (default)
+    const sortedDates = Object.keys(groupedByDate).sort(
+      (a, b) => new Date(b) - new Date(a)
+    );
+
     const start = (page - 1) * pageSize;
     const pagedDates = sortedDates.slice(start, start + pageSize);
 
-    const pagedData = pagedDates.map(date => ({
+    const pagedData = pagedDates.map((date) => ({
       tanggal: date,
       data: groupedByDate[date],
     }));

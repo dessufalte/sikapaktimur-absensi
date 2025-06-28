@@ -1,10 +1,12 @@
-
 import "./globals.css";
-import Navbar from "./_component/navbar"; 
+import Navbar from "./_component/navbar";
 
 export const metadata = {
-  title: "Absensi App",
+  title: "Absensi Sikapak Timur",
   description: "Sistem Absensi",
+  icons: {
+    icon: "favicon.png", // bisa juga "/favicon.png"
+  },
 };
 
 export default function RootLayout({ children }) {

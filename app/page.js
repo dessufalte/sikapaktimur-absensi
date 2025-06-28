@@ -1,44 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { database } from "./lib/firebase";
-import { ref, onValue } from "firebase/database";
-import { firestore } from "./lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { addDoc } from "firebase/firestore";
+import DokumentasiCard from "./_component/doccard";
 
-export default function Home() { 
-
+export default function Home() {
   return (
     <main>
       <div className="main-content">
-        <div className="relative h-[300px]">
+        {/* Banner Section */}
+        <div className="relative">
           <img
-            src="/ovs.jpg"
-            alt="ov"
-            className="w-full h-full block bg-white"
+            src="banner1.webp"
+            alt="banner"
+            className="w-full h-full block bg-white object-cover"
           />
-          <div className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center text-xl">
-            <h1 className="font-bold text-2xl">
+          <div className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center text-xl px-4 text-center">
+            <h1 className="font-bold text-2xl sm:text-3xl">
               Selamat Datang di Absensi Sikapak Timur
             </h1>
-            <p className="mt-4 max-w-md text-center text-sm">
-              Sistem absensi menggunakan sensor sidik jari dan data realtime.
+            <p className="mt-4 max-w-md text-sm sm:text-base">
+              Sistem absensi berbasis digital menggunakan sensor sidik jari dan
+              pencatatan kehadiran secara realtime.
             </p>
           </div>
         </div>
+
+        {/* Dokumentasi Section */}
+        <section className="py-10 px-4 max-w-5xl mx-auto">
+          <DokumentasiCard />
+        </section>
       </div>
-
-      <div className="bg-white text-black p-4 rounded shadow mt-4">
-        <h1 className="font-semibold text-lg">Reader</h1>
-        <p className="text-sm mt-2 text-gray-600">
-          Data pengguna yang baru melakukan scan:
-        </p>
-
-        <div className="mt-4 text-sm">
-       
+      <footer className="bg-emerald-600 text-white py-6 mt-10">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center text-sm">
+          <div className="mb-2 sm:mb-0 text-center sm:text-left">
+            © {new Date().getFullYear()} Kantor Wali Nagari Sikapak Timur. All
+            rights reserved.
+          </div>
+          <div className="text-center sm:text-right">
+            Kontak:{" "}
+            <a
+              href="mailto:sikapak.absen@example.com"
+              className="underline hover:text-gray-200"
+            >
+              sikapak.absen@example.com
+            </a>
+          </div>
         </div>
-      </div>
+      </footer>
     </main>
   );
 }

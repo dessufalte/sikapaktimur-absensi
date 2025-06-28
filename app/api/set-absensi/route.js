@@ -15,6 +15,7 @@ export async function POST(req) {
       status,
       timestamp: new Date(tanggal), 
       late: false,
+      timehome: null,
     });
 
     return NextResponse.json({ success: true });

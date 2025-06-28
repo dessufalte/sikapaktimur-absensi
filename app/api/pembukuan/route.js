@@ -50,6 +50,7 @@ export async function POST() {
             status: 'Alfa',
             late: false,
             timestamp: Timestamp.fromDate(new Date()),
+            timehome: "-",
           });
           count++;
         }

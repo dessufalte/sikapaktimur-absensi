@@ -1,4 +1,6 @@
 import dayjs from "dayjs";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export async function handleExportCSV(selectedMonth) {
   if (!selectedMonth) return;
@@ -50,19 +52,76 @@ export async function handlePrintBulanan(selectedMonth) {
     <head>
       <title>Laporan Absensi Bulan ${selectedMonth}</title>
       <style>
+        body {
+          font-family: 'Arial', sans-serif;
+          padding: 40px;
+          color: #000;
+        }
+
+        .header {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+
+        .header h1 {
+          margin: 0;
+          font-size: 20px;
+          font-weight: bold;
+        }
+
+        .header h2 {
+          margin: 0;
+          font-size: 18px;
+          margin-bottom: 10px;
+        }
+
+        h3 {
+          text-align: center;
+          margin-top: 30px;
+          margin-bottom: 20px;
+        }
+
         table {
           width: 100%;
           border-collapse: collapse;
+          margin-bottom: 40px;
         }
+
         th, td {
           border: 1px solid #000;
-          padding: 4px;
-          text-align: left;
+          padding: 6px 8px;
+          text-align: center;
+          font-size: 14px;
+        }
+
+        th {
+          background-color: #f0f0f0;
+        }
+
+        .ttd-section {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          margin-top: 60px;
+        }
+
+        .ttd-box {
+          width: 45%;
+          text-align: center;
+        }
+
+        .ttd-space {
+          height: 80px;
         }
       </style>
     </head>
     <body>
-      <h2>Laporan Absensi Bulan ${selectedMonth}</h2>
+      <div class="header">
+        <h1>KANTOR WALI NAGARI SIKAPAK TIMUR</h1>
+        <h2>LAPORAN ABSENSI PEGAWAI</h2>
+        <p><strong>Periode Bulan: ${selectedMonth}</strong></p>
+      </div>
+
       <table>
         <thead>
           <tr>
@@ -70,6 +129,8 @@ export async function handlePrintBulanan(selectedMonth) {
             <th>Tanggal</th>
             <th>Status</th>
             <th>Keterlambatan</th>
+            <th>Jam Masuk</th>
+            <th>Jam Pulang</th>
           </tr>
         </thead>
         <tbody>
@@ -77,6 +138,18 @@ export async function handlePrintBulanan(selectedMonth) {
             .map((item) => {
               const t = new Date(item.timestamp);
               const tanggal = t.toLocaleDateString("id-ID");
+              const jamMasuk = t.toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+
+              const jamPulang = item.timehome
+                ? new Date(item.timehome).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "-";
+
               const keterlambatan = (() => {
                 const std = new Date(t);
                 std.setHours(8, 0, 0, 0);
@@ -85,16 +158,34 @@ export async function handlePrintBulanan(selectedMonth) {
                   ? "Tepat Waktu"
                   : `${Math.floor(selisih / 60000)} menit terlambat`;
               })();
+
               return `<tr>
                 <td>${item.nama}</td>
                 <td>${tanggal}</td>
                 <td>${item.status}</td>
-                <td>${keterlambatan}</td>
+                <td>${item.status === "Alfa" ? "-" : keterlambatan}</td>
+                <td>${item.status === "Alfa" ? "-" : jamMasuk}</td>
+                <td>${item.status === "Alfa" ? "-" : jamPulang}</td>
               </tr>`;
             })
             .join("")}
         </tbody>
       </table>
+
+      <div class="ttd-section">
+        <div class="ttd-box">
+          <p>Sikapak Timur, .......................</p>
+          <p><strong>Kepala Wali Nagari</strong></p>
+          <div class="ttd-space"></div>
+          <p><strong>(_________________________)</strong></p>
+        </div>
+        <div class="ttd-box">
+          <p>Dicetak oleh:</p>
+          <p><strong>Petugas Absensi</strong></p>
+          <div class="ttd-space"></div>
+          <p><strong>(_________________________)</strong></p>
+        </div>
+      </div>
     </body>
     </html>
   `;
@@ -102,8 +193,10 @@ export async function handlePrintBulanan(selectedMonth) {
   const printWindow = window.open("", "_blank");
   printWindow.document.write(html);
   printWindow.document.close();
+  printWindow.focus();
   printWindow.print();
 }
+
 
 export async function handleSetAbsensi({ userId, status, tanggal }) {
   try {
@@ -193,4 +286,43 @@ export async function handleTutupAbsen() {
     alert("❌ Terjadi kesalahan koneksi atau server. Silakan coba lagi.");
     return null;
   }
+}
+
+export async function handleExportExcel(selectedMonth) {
+  if (!selectedMonth) return;
+
+  const res = await fetch(`/api/laporan?bulan=${selectedMonth}`);
+  const { absensi } = await res.json();
+
+  // Format data untuk Excel
+  const rows = absensi.map((item) => {
+    const t = new Date(item.timestamp);
+    const tanggal = t.toLocaleDateString("id-ID");
+    const jamMasuk = t.toLocaleTimeString("id-ID");
+
+    const keterlambatan = (() => {
+      const standar = new Date(t);
+      standar.setHours(8, 0, 0, 0);
+      const selisih = t.getTime() - standar.getTime();
+      return selisih <= 0
+        ? "Tepat Waktu"
+        : `${Math.floor(selisih / (1000 * 60))} menit terlambat`;
+    })();
+
+    return {
+      Nama: item.nama,
+      Tanggal: tanggal,
+      Status: item.status,
+      Keterlambatan: keterlambatan,
+      "Jam Masuk": jamMasuk,
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Absensi");
+
+  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+  saveAs(blob, `laporan_absensi_${selectedMonth}.xlsx`);
 }

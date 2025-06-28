@@ -14,11 +14,10 @@ export async function POST(req) {
       );
     }
 
-    // Gunakan waktu server saat ini (UTC)
     const now = new Date();
     const firestoreTimestamp = admin.firestore.Timestamp.fromDate(now);
 
-    // Cek user
+    // Cari user
     const userSnapshot = await firestoreAdmin
       .collection("user")
       .where("id", "==", id)
@@ -32,37 +31,76 @@ export async function POST(req) {
       );
     }
 
-    // Cek apakah sudah absen hari ini
     const awalHari = new Date(now);
     awalHari.setHours(0, 0, 0, 0);
-
     const akhirHari = new Date(now);
     akhirHari.setHours(23, 59, 59, 999);
 
+    // Ambil data absensi hari ini
     const absenSnapshot = await firestoreAdmin
       .collection("absensi")
       .where("id", "==", id)
       .get();
 
-    const sudahAbsen = absenSnapshot.docs.some((doc) => {
-      const waktu = doc.data().timestamp?.toDate?.() || new Date(doc.data().timestamp);
-      return waktu >= awalHari && waktu <= akhirHari;
+    let absenHariIni = null;
+
+    absenSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const waktu = data.timestamp?.toDate?.() || new Date(data.timestamp);
+      if (waktu >= awalHari && waktu <= akhirHari) {
+        absenHariIni = { id: doc.id, data };
+      }
     });
 
-    if (sudahAbsen) {
+    const jam17 = new Date(now);
+    jam17.setHours(17, 0, 0, 0);
+
+    if (absenHariIni) {
+      const { timehome } = absenHariIni.data;
+
+      // Sudah absen dan sudah pulang
+      if (timehome) {
+        return NextResponse.json(
+          { error: "User sudah absen masuk dan pulang hari ini" },
+          { status: 409, headers: { "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+
+      // Belum waktunya pulang
+      if (now < jam17) {
+        return NextResponse.json(
+          { error: "Belum waktunya absen pulang. Bisa setelah jam 17:00." },
+          { status: 403, headers: { "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+
+      // Waktu pulang: update timehome
+      await firestoreAdmin
+        .collection("absensi")
+        .doc(absenHariIni.id)
+        .update({
+          timehome: firestoreTimestamp,
+        });
+
       return NextResponse.json(
-        { error: "User sudah absen hari ini" },
-        { status: 409, headers: { "Access-Control-Allow-Origin": "*" } }
+        {
+          message: "Absen pulang berhasil",
+          id,
+          timehome: firestoreTimestamp,
+        },
+        {
+          status: 200,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
       );
     }
 
-    // Hitung keterlambatan berdasarkan jam 08:00 (server UTC)
+    // Belum absen hari ini → absen masuk
     const batasMasuk = new Date(now);
     batasMasuk.setHours(8, 0, 0, 0);
-
     const late = now > batasMasuk;
-
-    // Tetapkan status selalu "Hadir"
     const statusAbsen = "Hadir";
 
     await firestoreAdmin.collection("absensi").add({
@@ -70,11 +108,12 @@ export async function POST(req) {
       status: statusAbsen,
       late,
       timestamp: firestoreTimestamp,
+      timehome: null,
     });
 
     return NextResponse.json(
       {
-        message: "Absensi berhasil",
+        message: "Absensi masuk berhasil",
         id,
         late,
         status: statusAbsen,
@@ -83,7 +122,7 @@ export async function POST(req) {
       {
         status: 200,
         headers: {
-          "Access-Control-Allow-Origin": "*"
+          "Access-Control-Allow-Origin": "*",
         },
       }
     );

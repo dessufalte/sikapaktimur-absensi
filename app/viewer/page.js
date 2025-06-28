@@ -7,13 +7,16 @@ import {
   handlePrintBulanan,
   handleSetAbsensi,
   handleDisablePembukuan,
-  handleTutupAbsen
+  handleTutupAbsen,
+  handleExportExcel,
 } from "./_utils/handleEvents";
 import { firestore } from "../lib/firebase";
 import StackedAbsensiChart from "./_component/chart";
 import AbsensiPieChart from "./_component/piechart";
 import KalenderAbsensi from "./_component/cale";
 import { set } from "firebase/database";
+import CardStatistik from "./_component/cardstatistik";
+import { FaCheckCircle, FaUserEdit } from "react-icons/fa";
 
 export default function View() {
   const [users, setUsers] = useState([]);
@@ -90,35 +93,54 @@ export default function View() {
   };
 
   const tutupAbsen = async () => {
-  try {
-    const result = await handleTutupAbsen();
-    alert(`✅ ${result.message}`);
-  } catch (err) {
-    alert("❌ Gagal menutup absensi");
-  }
-};
+    try {
+      const result = await handleTutupAbsen();
+      alert(`✅ ${result.message}`);
+    } catch (err) {
+      alert("❌ Gagal menutup absensi");
+    }
+  };
   return (
     <main className="p-5 flex flex-col">
-      <section className="grid grid-cols-3-row grid-cols-4 gap-4 mb-6">
-        <div className="card border-l-4 bg-white-500 border-t-[1px] border-t-gray-200 border-r-[1px] border-r-gray-200 text-emerald-500 p-4 shadow-lg rounded-lg">
-          <h1 className="font-bold text-md"></h1>
-          <p className="text-emerald-400">
-            {statistik.persentaseHadirBulan}% Kehadiran
-          </p>
-        </div>
+      <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <CardStatistik
+          title="Kehadiran Bulan Ini"
+          value={`${statistik.persentaseHadirBulan}%`}
+          icon="persentase"
+        />
+        <CardStatistik
+          title="Total Terlambat"
+          value={`${statistik.totalTerlambat} kali`}
+          icon="terlambat"
+        />
+        <CardStatistik
+          title="Total Pengguna"
+          value={`${statistik.totalUser} orang`}
+          icon="user"
+        />
+        <CardStatistik
+          title="Hari Kerja"
+          value={`${statistik.totalHariKerja} hari`}
+          icon="hariKerja"
+        />
+        <CardStatistik
+          title="Potensi Absen"
+          value={`${statistik.totalPotensiAbsen} catatan`}
+          icon="potensi"
+        />
+        <CardStatistik
+          title="Total Hadir"
+          value={`${statistik.totalHadir} kali`}
+          icon="hadir"
+        />
 
-        {/* Terlambat Bulan Ini */}
-        <div className="card bg-white-500 border-t-[1px] border-t-gray-200 border-r-[1px] border-r-gray-200 border-l-4 text-emerald-500 p-4 shadow-lg rounded-lg">
-          <h1 className="font-bold text-md">{statistik.totalTerlambat} Terlambat</h1>
-          <p className="text-emerald-400">Periode: Bulan Ini</p>
-        </div>
-
-        <div className="grid grid-rows-2">
+        {/* Filter tetap seperti sebelumnya */}
+        <div className="flex flex-col justify-center">
           <h2 className="text-emerald-600 font-bold mb-2">Filter :</h2>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="shadow-lg border-[1px] border-gray-200 rounded-lg p-2 outline-0 text-black"
+            className="shadow-md border-[1px] border-gray-300 rounded-lg p-2 outline-0 text-black"
           >
             <option value="minggu">Per Minggu</option>
             <option value="bulan">Per Bulan (12 Bulan)</option>
@@ -126,7 +148,6 @@ export default function View() {
           </select>
         </div>
       </section>
-
       <section className="grid lg:grid-cols-4 md:grid-cols-3 gap-4 mb-6">
         <div className="md:col-span-3 lg:col-span-2 bg-white p-4 text-black  border-[1px] border-gray-200 rounded-lg shadow-lg items-center">
           <StackedAbsensiChart filter={filter} dataFromApi={allAbsensi} />
@@ -139,8 +160,8 @@ export default function View() {
         </div>
       </section>
 
-      <section className="grid grid-cols-5 gap-4">
-        <div className="col-span-2 shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
+      <section className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-5 mb-6">
+        <div className="lg:col-span-2 md:col-span-2 sm:col-span-1 shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
           <h2 className="text-emerald-600 font-bold mb-2">Data Pengguna</h2>
           <table className="min-w-full text-sm border-separate border-spacing-0">
             <thead className="bg-emerald-400">
@@ -157,16 +178,17 @@ export default function View() {
                   <td className="border-b px-2 py-1">{user.id}</td>
                   <td className="border-b px-2 py-1">{user.nama}</td>
                   <td className="border-b px-2 py-1">{user.jabatan}</td>
-                  <td className="border-b px-2 py-1">
+                  <td className="border-b px-2 py-1 text-center">
                     {!isUserPresent(user.id) && (
                       <button
                         onClick={() => {
                           setSelectedUser(user);
                           setShowModal(true);
                         }}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded"
+                        className="text-emerald-500 hover:text-emerald-700 text-xl"
+                        title="Set Kehadiran"
                       >
-                        Set Kehadiran
+                        <FaUserEdit />
                       </button>
                     )}
                   </td>
@@ -176,7 +198,7 @@ export default function View() {
           </table>
         </div>
 
-        <div className="col-span-3 flex flex-col shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
+        <div className="lg:col-span-3 md:col-span-2 sm:col-span-1 flex flex-col shadow-lg rounded-2xl border-[1px] border-gray-200 p-4">
           <h2 className="text-emerald-600 font-bold mb-2">
             Halaman Absensi: {currentPageDate}
           </h2>
@@ -188,16 +210,33 @@ export default function View() {
                 <th className="px-2 py-1">Status</th>
                 <th className="px-2 py-1">Keterlambatan</th>
                 <th className="px-2 py-1">Jam Masuk</th>
+                <th className="px-2 py-1">Jam Pulang</th>
               </tr>
             </thead>
-            <tbody className="bg-white text-black">
+            <tbody className="bg-white text-black text-center">
               {absensi.map((item) => {
                 const user = users.find(
                   (u) => String(u.id) === String(item.id)
                 );
                 const jam = item.timestamp ? new Date(item.timestamp) : null;
-                const jamMasuk = jam?.toLocaleString("id-ID") ?? "-";
+                const jamMasuk =
+                  jam?.toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }) ?? "-";
 
+                const jamPulang =
+                  item.timehome && item.timehome.toDate
+                    ? item.timehome.toDate().toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : item.timehome
+                    ? new Date(item.timehome).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "-";
                 const lateText = (() => {
                   if (!jam) return "-";
                   const std = new Date(jam);
@@ -212,9 +251,33 @@ export default function View() {
                   <tr key={item.idDoc}>
                     <td className="border-b px-2 py-1">{item.id}</td>
                     <td className="border-b px-2 py-1">{user?.nama ?? "-"}</td>
-                    <td className="border-b px-2 py-1">{item.status}</td>
-                    <td className="border-b px-2 py-1">{lateText}</td>
+                    <td
+                      className={`border-b border-black px-2 py-1 font-semibold ${
+                        item.status.toLowerCase() === "alfa"
+                          ? "text-red-600"
+                          : ""
+                      }`}
+                    >
+                      {item.status}
+                    </td>
+                    <td
+                      className={`border-b border-black px-2 py-1 ${
+                        ["Alfa", "Izin", "Sakit"].includes(item.status)
+                          ? ""
+                          : lateText === "Tepat Waktu"
+                          ? "text-green-600"
+                          : parseInt(lateText) < 10
+                          ? "text-yellow-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {["Alfa", "Izin", "Sakit"].includes(item.status)
+                        ? "-"
+                        : lateText}
+                    </td>
+
                     <td className="border-b px-2 py-1">{jamMasuk}</td>
+                    <td className="border-b px-2 py-1">{jamPulang}</td>
                   </tr>
                 );
               })}
@@ -261,6 +324,16 @@ export default function View() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded "
             >
               Print
+            </button>
+          </>
+        )}
+        {filter === "bulan" && (
+          <>
+            <button
+              onClick={() => handleExportExcel(selectedMonth)}
+              className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
+            >
+              Export Excel
             </button>
           </>
         )}

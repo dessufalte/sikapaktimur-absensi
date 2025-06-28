@@ -6,7 +6,10 @@ export async function GET(req) {
   const bulan = searchParams.get('bulan'); // format YYYY-MM
 
   if (!bulan) {
-    return NextResponse.json({ success: false, error: 'Parameter bulan wajib diisi' }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: 'Parameter bulan wajib diisi' },
+      { status: 400 }
+    );
   }
 
   const [year, month] = bulan.split('-').map(Number);
@@ -19,15 +22,23 @@ export async function GET(req) {
   });
 
   const absensi = absensiSnapshot.docs
-    .map(doc => ({ ...doc.data(), timestamp: doc.data().timestamp.toDate() }))
+    .map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        timestamp: data.timestamp?.toDate?.() ?? null,
+        timehome: data.timehome?.toDate?.() ?? data.timehome ?? null,
+      };
+    })
     .filter(item =>
+      item.timestamp &&
       item.timestamp.getFullYear() === year &&
       item.timestamp.getMonth() + 1 === month
     )
     .map(item => ({
       ...item,
       nama: userMap[item.id]?.nama ?? 'Tidak Diketahui',
-      jabatan: userMap[item.id]?.jabatan ?? 'Tidak Diketahui'
+      jabatan: userMap[item.id]?.jabatan ?? 'Tidak Diketahui',
     }));
 
   return NextResponse.json({ success: true, absensi });
