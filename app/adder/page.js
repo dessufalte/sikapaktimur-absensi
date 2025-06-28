@@ -121,8 +121,7 @@ export default function Adder() {
           >
             <option value="">Pilih jabatan</option>
             <option value="Staff">Staff</option>
-            <option value="Kepala Seksi">Kepala Seksi</option>
-            <option value="Kepala Dinas">Kepala Dinas</option>
+            <option value="Kepala Dinas">Kepala Desa</option>
           </select>
         </div>
 

@@ -4,8 +4,7 @@ import admin from "firebase-admin";
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { id, confidence } = body;
+    const { id, confidence } = await req.json();
 
     if (typeof id !== "number") {
       return NextResponse.json(
@@ -14,10 +13,7 @@ export async function POST(req) {
       );
     }
 
-    const now = new Date();
-    const firestoreTimestamp = admin.firestore.Timestamp.fromDate(now);
-
-    // Cari user
+    // 🔍 Cek apakah user valid
     const userSnapshot = await firestoreAdmin
       .collection("user")
       .where("id", "==", id)
@@ -31,12 +27,17 @@ export async function POST(req) {
       );
     }
 
-    const awalHari = new Date(now);
+    const now = new Date();
+    const firestoreTimestamp = admin.firestore.Timestamp.fromDate(now);
+
+    // Konversi ke WIB
+    const nowWIB = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+    const awalHari = new Date(nowWIB);
     awalHari.setHours(0, 0, 0, 0);
-    const akhirHari = new Date(now);
+    const akhirHari = new Date(nowWIB);
     akhirHari.setHours(23, 59, 59, 999);
 
-    // Ambil data absensi hari ini
+    // Cek apakah user sudah absen hari ini
     const absenSnapshot = await firestoreAdmin
       .collection("absensi")
       .where("id", "==", id)
@@ -46,19 +47,21 @@ export async function POST(req) {
 
     absenSnapshot.forEach((doc) => {
       const data = doc.data();
-      const waktu = data.timestamp?.toDate?.() || new Date(data.timestamp);
-      if (waktu >= awalHari && waktu <= akhirHari) {
+      const waktu = data.timestamp?.toDate?.();
+      if (!waktu) return;
+
+      const waktuWIB = new Date(waktu.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+      if (waktuWIB >= awalHari && waktuWIB <= akhirHari) {
         absenHariIni = { id: doc.id, data };
       }
     });
 
-    const jam17 = new Date(now);
-    jam17.setHours(17, 0, 0, 0);
+    const jam17 = new Date(nowWIB);
+    jam17.setHours(16, 0, 0, 0);
 
     if (absenHariIni) {
       const { timehome } = absenHariIni.data;
 
-      // Sudah absen dan sudah pulang
       if (timehome) {
         return NextResponse.json(
           { error: "User sudah absen masuk dan pulang hari ini" },
@@ -66,46 +69,39 @@ export async function POST(req) {
         );
       }
 
-      // Belum waktunya pulang
-      if (now < jam17) {
+      if (nowWIB < jam17) {
         return NextResponse.json(
-          { error: "Belum waktunya absen pulang. Bisa setelah jam 17:00." },
+          { error: "Belum waktunya absen pulang. Bisa setelah jam 17:00 WIB." },
           { status: 403, headers: { "Access-Control-Allow-Origin": "*" } }
         );
       }
 
-      // Waktu pulang: update timehome
-      await firestoreAdmin
-        .collection("absensi")
-        .doc(absenHariIni.id)
-        .update({
-          timehome: firestoreTimestamp,
-        });
+      // Absen pulang
+      await firestoreAdmin.collection("absensi").doc(absenHariIni.id).update({
+        timehome: firestoreTimestamp,
+      });
 
       return NextResponse.json(
         {
-          message: "Absen pulang berhasil",
+          message: "Absensi pulang berhasil",
           id,
           timehome: firestoreTimestamp,
         },
         {
           status: 200,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Access-Control-Allow-Origin": "*" },
         }
       );
     }
 
-    // Belum absen hari ini → absen masuk
-    const batasMasuk = new Date(now);
+    // Absen masuk
+    const batasMasuk = new Date(nowWIB);
     batasMasuk.setHours(8, 0, 0, 0);
-    const late = now > batasMasuk;
-    const statusAbsen = "Hadir";
+    const late = nowWIB > batasMasuk;
 
     await firestoreAdmin.collection("absensi").add({
       id,
-      status: statusAbsen,
+      status: "Hadir",
       late,
       timestamp: firestoreTimestamp,
       timehome: null,
@@ -116,14 +112,12 @@ export async function POST(req) {
         message: "Absensi masuk berhasil",
         id,
         late,
-        status: statusAbsen,
+        status: "Hadir",
         timestamp: firestoreTimestamp,
       },
       {
         status: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Access-Control-Allow-Origin": "*" },
       }
     );
   } catch (err) {

@@ -6,7 +6,6 @@ export async function POST(req) {
     const body = await req.json();
     const { id, nama, jabatan } = body;
 
-    // Validasi input
     if (typeof id !== "number" || !nama || !jabatan) {
       return NextResponse.json(
         { error: "ID (number), nama, dan jabatan wajib diisi" },
@@ -14,22 +13,11 @@ export async function POST(req) {
       );
     }
 
-    // Cek apakah ID sudah terdaftar
-    const existing = await firestoreAdmin
-      .collection("user")
-      .where("id", "==", id)
-      .limit(1)
-      .get();
+    // Gunakan ID sebagai nama dokumen agar unik
+    const userRef = firestoreAdmin.collection("user").doc(String(id));
 
-    if (!existing.empty) {
-      return NextResponse.json(
-        { error: "ID sudah terdaftar" },
-        { status: 409 }
-      );
-    }
-
-    // Simpan ke Firestore
-    await firestoreAdmin.collection("user").add({
+    // Akan throw error jika doc sudah ada
+    await userRef.create({
       id,
       nama,
       jabatan,
@@ -41,6 +29,14 @@ export async function POST(req) {
       { status: 201 }
     );
   } catch (err) {
+    if (err.code === 6 || err.message?.includes("Already exists")) {
+      // Firestore error code 6 = ALREADY_EXISTS
+      return NextResponse.json(
+        { error: "ID sudah terdaftar" },
+        { status: 409 }
+      );
+    }
+
     console.error("API Error:", err);
     return NextResponse.json(
       { error: "Internal Server Error" },

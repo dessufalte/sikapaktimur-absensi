@@ -18,16 +18,18 @@ export async function GET(req) {
         idDoc: doc.id,
         ...docData,
         timestamp: timestampDate ? timestampDate.toISOString() : null,
+        localDate: timestampDate
+          ? timestampDate.toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" })
+          : null,
       };
     });
 
-    // Group berdasarkan tanggal
+    // Group berdasarkan localDate
     const groupedByDate = {};
     data.forEach((item) => {
-      if (!item.timestamp) return;
-      const dateStr = item.timestamp.split("T")[0]; // YYYY-MM-DD
-      if (!groupedByDate[dateStr]) groupedByDate[dateStr] = [];
-      groupedByDate[dateStr].push(item);
+      if (!item.localDate) return;
+      if (!groupedByDate[item.localDate]) groupedByDate[item.localDate] = [];
+      groupedByDate[item.localDate].push(item);
     });
 
     // Jika `tanggal` disediakan → ambil data tanggal itu

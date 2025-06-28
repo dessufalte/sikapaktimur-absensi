@@ -117,7 +117,7 @@ export async function handlePrintBulanan(selectedMonth) {
     </head>
     <body>
       <div class="header">
-        <h1>KANTOR WALI NAGARI SIKAPAK TIMUR</h1>
+        <h1>KANTOR DESA SIKAPAK TIMUR</h1>
         <h2>LAPORAN ABSENSI PEGAWAI</h2>
         <p><strong>Periode Bulan: ${selectedMonth}</strong></p>
       </div>
@@ -175,7 +175,7 @@ export async function handlePrintBulanan(selectedMonth) {
       <div class="ttd-section">
         <div class="ttd-box">
           <p>Sikapak Timur, .......................</p>
-          <p><strong>Kepala Wali Nagari</strong></p>
+          <p><strong>Kepala Desa</strong></p>
           <div class="ttd-space"></div>
           <p><strong>(_________________________)</strong></p>
         </div>

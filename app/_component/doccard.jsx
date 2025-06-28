@@ -37,9 +37,9 @@ export default function DokumentasiCard() {
         <ol className="list-decimal list-inside text-gray-700 space-y-2 text-sm sm:text-base">
           <li>Pastikan perangkat fingerprint telah terkoneksi dan aktif.</li>
           <li>Setiap pegawai meletakkan jari di sensor untuk melakukan absen masuk.</li>
-          <li>Data waktu akan tercatat otomatis ke dalam sistem dan database Firebase.</li>
-          <li>Untuk absen pulang, ulangi proses di atas setelah pukul 17.00 WIB.</li>
-          <li>Admin dapat melihat data kehadiran melalui dashboard aplikasi web.</li>
+          <li>Data waktu akan tercatat otomatis ke dalam sistem dan database.</li>
+          <li>Untuk absen pulang, ulangi proses di atas setelah pukul 16.00 WIB.</li>
+          <li>Data kehadiran dapat dicek melalui dashboard aplikasi web.</li>
           <li>Laporan dapat dicetak atau diekspor melalui fitur yang tersedia.</li>
         </ol>
       </div>

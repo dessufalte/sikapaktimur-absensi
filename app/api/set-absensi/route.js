@@ -10,10 +10,12 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: "Data tidak lengkap" }, { status: 400 });
     }
 
+    const waktu = new Date(`${tanggal}T00:00:00+07:00`);
+
     await firestoreAdmin.collection("absensi").add({
       id: userId,
       status,
-      timestamp: new Date(tanggal), 
+      timestamp: waktu,
       late: false,
       timehome: null,
     });

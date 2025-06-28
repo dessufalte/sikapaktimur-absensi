@@ -16,7 +16,7 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center text-xl px-4 text-center">
             <h1 className="font-bold text-2xl sm:text-3xl">
-              Selamat Datang di Absensi Sikapak Timur
+              Selamat Datang di Absensi Desa Sikapak Timur
             </h1>
             <p className="mt-4 max-w-md text-sm sm:text-base">
               Sistem absensi berbasis digital menggunakan sensor sidik jari dan
@@ -33,7 +33,7 @@ export default function Home() {
       <footer className="bg-emerald-600 text-white py-6 mt-10">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center text-sm">
           <div className="mb-2 sm:mb-0 text-center sm:text-left">
-            © {new Date().getFullYear()} Kantor Wali Nagari Sikapak Timur. All
+            © {new Date().getFullYear()} Kantor Desa Sikapak Timur. All
             rights reserved.
           </div>
           <div className="text-center sm:text-right">
@@ -42,7 +42,7 @@ export default function Home() {
               href="mailto:sikapak.absen@example.com"
               className="underline hover:text-gray-200"
             >
-              sikapak.absen@example.com
+              sikapaktimur@gmail.com
             </a>
           </div>
         </div>

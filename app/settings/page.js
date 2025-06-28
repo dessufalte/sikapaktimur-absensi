@@ -1,42 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { firestore } from "../lib/firebase";
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  query,
-  limit,
-} from "firebase/firestore";
+import { fetchSettings, saveSettings } from "./_utils/eventHandler";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({
-    wifiName: "",
-    wifiPassword: "",
-  });
-
+  const [form, setForm] = useState({ wifiName: "", wifiPassword: "" });
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const q = query(collection(firestore, "settings"), limit(1));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
-          setForm({
-            wifiName: data.wifiName || "",
-            wifiPassword: data.wifiPassword || "",
-          });
-        }
-      } catch (err) {
-        console.error("Gagal ambil data settings:", err);
-      }
-    };
-
-    fetchSettings();
+    fetchSettings()
+      .then(setForm)
+      .catch((err) => setStatus("❌ " + err.message));
   }, []);
 
   const handleChange = (e) => {
@@ -46,16 +20,13 @@ export default function SettingsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setStatus("");
+
     try {
-      await setDoc(doc(firestore, "settings", "wifi-config"), {
-        wifiName: form.wifiName,
-        wifiPassword: form.wifiPassword,
-        updatedAt: new Date().toISOString(),
-      });
+      await saveSettings(form);
       setStatus("✅ Pengaturan berhasil disimpan.");
     } catch (err) {
-      console.error("Gagal simpan pengaturan:", err);
-      setStatus("❌ Gagal menyimpan pengaturan.");
+      setStatus("❌ " + err.message);
     }
   };
 
@@ -99,11 +70,7 @@ export default function SettingsPage() {
           Simpan Pengaturan
         </button>
 
-        {status && (
-          <div className="text-sm font-medium text-emerald-600 mt-2">
-            {status}
-          </div>
-        )}
+        {status && <div className="text-sm font-medium mt-3 text-emerald-600">{status}</div>}
       </form>
     </main>
   );

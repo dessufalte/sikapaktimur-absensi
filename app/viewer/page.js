@@ -16,7 +16,7 @@ import AbsensiPieChart from "./_component/piechart";
 import KalenderAbsensi from "./_component/cale";
 import { set } from "firebase/database";
 import CardStatistik from "./_component/cardstatistik";
-import { FaCheckCircle, FaUserEdit } from "react-icons/fa";
+import { FaCheckCircle, FaSync, FaUserEdit } from "react-icons/fa";
 
 export default function View() {
   const [users, setUsers] = useState([]);
@@ -30,6 +30,7 @@ export default function View() {
   const [disablePembukuan, setDisablePembukuan] = useState(false);
   const [currentPageDate, setCurrentPageDate] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
@@ -100,6 +101,42 @@ export default function View() {
       alert("❌ Gagal menutup absensi");
     }
   };
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const sortedAbsensi = useMemo(() => {
+    const data = [...absensi];
+
+    if (!sortConfig.key) return data;
+
+    return data.sort((a, b) => {
+      let aValue, bValue;
+
+      if (sortConfig.key === "nama") {
+        const aUser = users.find((u) => String(u.id) === String(a.id));
+        const bUser = users.find((u) => String(u.id) === String(b.id));
+        aValue = aUser?.nama || "";
+        bValue = bUser?.nama || "";
+      } else if (sortConfig.key === "jamMasuk") {
+        aValue = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        bValue = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      } else {
+        aValue = a[sortConfig.key];
+        bValue = b[sortConfig.key];
+      }
+
+      if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [absensi, users, sortConfig]);
+
   return (
     <main className="p-5 flex flex-col">
       <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -135,17 +172,27 @@ export default function View() {
         />
 
         {/* Filter tetap seperti sebelumnya */}
-        <div className="flex flex-col justify-center">
-          <h2 className="text-emerald-600 font-bold mb-2">Filter :</h2>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="shadow-md border-[1px] border-gray-300 rounded-lg p-2 outline-0 text-black"
-          >
-            <option value="minggu">Per Minggu</option>
-            <option value="bulan">Per Bulan (12 Bulan)</option>
-            <option value="tahun">Per Tahun (10 Tahun)</option>
-          </select>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 justify-between">
+          <div className="flex flex-col">
+            <h2 className="text-emerald-600 font-bold mb-2">Filter :</h2>
+            <div className="gap-2 flex flex-row">
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="shadow-md border-[1px] border-gray-300 rounded-lg p-2 outline-0 text-black"
+              >
+                <option value="minggu">Per Minggu</option>
+                <option value="bulan">Per Bulan (12 Bulan)</option>
+                <option value="tahun">Per Tahun (10 Tahun)</option>
+              </select>
+              <button
+                onClick={() => setRefreshKey((k) => k + 1)}
+                className="mt-4 sm:mt-0 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-4 py-2 rounded-lg shadow-md"
+              >
+                <FaSync />
+              </button>
+            </div>
+          </div>
         </div>
       </section>
       <section className="grid lg:grid-cols-4 md:grid-cols-3 gap-4 mb-6">
@@ -205,20 +252,62 @@ export default function View() {
           <table className="min-w-full text-sm border-separate border-spacing-0 mb-4">
             <thead className="bg-emerald-400">
               <tr>
-                <th className="px-2 py-1">ID</th>
-                <th className="px-2 py-1">Nama</th>
-                <th className="px-2 py-1">Status</th>
+                <th
+                  className="px-2 py-1 cursor-pointer select-none"
+                  onClick={() => handleSort("id")}
+                >
+                  ID{" "}
+                  {sortConfig.key === "id"
+                    ? sortConfig.direction === "asc"
+                      ? "↑"
+                      : "↓"
+                    : ""}
+                </th>
+                <th
+                  className="px-2 py-1 cursor-pointer select-none"
+                  onClick={() => handleSort("nama")}
+                >
+                  Nama{" "}
+                  {sortConfig.key === "nama"
+                    ? sortConfig.direction === "asc"
+                      ? "↑"
+                      : "↓"
+                    : ""}
+                </th>
+                <th
+                  className="px-2 py-1 cursor-pointer select-none"
+                  onClick={() => handleSort("status")}
+                >
+                  Status{" "}
+                  {sortConfig.key === "status"
+                    ? sortConfig.direction === "asc"
+                      ? "↑"
+                      : "↓"
+                    : ""}
+                </th>
                 <th className="px-2 py-1">Keterlambatan</th>
-                <th className="px-2 py-1">Jam Masuk</th>
+                <th
+                  className="px-2 py-1 cursor-pointer select-none"
+                  onClick={() => handleSort("jamMasuk")}
+                >
+                  Jam Masuk{" "}
+                  {sortConfig.key === "jamMasuk"
+                    ? sortConfig.direction === "asc"
+                      ? "↑"
+                      : "↓"
+                    : ""}
+                </th>
                 <th className="px-2 py-1">Jam Pulang</th>
               </tr>
             </thead>
+
             <tbody className="bg-white text-black text-center">
-              {absensi.map((item) => {
+              {sortedAbsensi.map((item) => {
                 const user = users.find(
                   (u) => String(u.id) === String(item.id)
                 );
                 const jam = item.timestamp ? new Date(item.timestamp) : null;
+
                 const jamMasuk =
                   jam?.toLocaleTimeString("id-ID", {
                     hour: "2-digit",
@@ -237,6 +326,7 @@ export default function View() {
                         minute: "2-digit",
                       })
                     : "-";
+
                 const lateText = (() => {
                   if (!jam) return "-";
                   const std = new Date(jam);
@@ -266,7 +356,7 @@ export default function View() {
                           ? ""
                           : lateText === "Tepat Waktu"
                           ? "text-green-600"
-                          : parseInt(lateText) < 10
+                          : parseInt(lateText) < 30
                           ? "text-yellow-600"
                           : "text-red-600"
                       }`}
@@ -275,7 +365,6 @@ export default function View() {
                         ? "-"
                         : lateText}
                     </td>
-
                     <td className="border-b px-2 py-1">{jamMasuk}</td>
                     <td className="border-b px-2 py-1">{jamPulang}</td>
                   </tr>
