@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// Import 'getAuth' and 'signInAnonymously' from the Firebase Auth SDK
-import { getAuth, signInAnonymously } from "firebase/auth";
-import { database } from "../lib/firebase"; // Your existing firebase initialization
+// Auth sudah tidak diperlukan di sini, kita hanya butuh database
+import { database } from "../lib/firebase";
 import { ref, onValue } from "firebase/database";
 
 export default function Adder() {
@@ -12,57 +11,42 @@ export default function Adder() {
     nama: "",
     jabatan: "",
   });
-  const [status, setStatus] = useState("Menghubungkan ke database..."); // Initial status
+  const [status, setStatus] = useState("Menghubungkan ke database sensor...");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // This function will be called to clean up the listener when the component unmounts
-    let unsubscribeFromDb = () => {};
+    // Karena tidak perlu otentikasi, kita bisa langsung terhubung ke database
+    const idRef = ref(database, "tambah_fingerprint");
+    
+    const unsubscribeFromDb = onValue(idRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data || !data.timestamp) {
+        setIdFingerprint("");
+        setStatus("Menunggu data dari sensor fingerprint...");
+        return;
+      }
 
-    // 1. Get the Firebase Auth instance
-    const auth = getAuth();
+      const now = new Date();
+      const fingerprintTime = new Date(data.timestamp);
+      const timeDiffMinutes = (now.getTime() - fingerprintTime.getTime()) / 1000 / 60;
 
-    // 2. Sign in the user anonymously
-    signInAnonymously(auth)
-      .then(() => {
-        // 3. Once signed in, set up the Realtime Database listener
-        console.log("User signed in anonymously.");
-        setStatus(""); // Clear connecting status
+      if (timeDiffMinutes <= 5) {
+        setIdFingerprint(data.id?.toString() || "");
+        setStatus("✅ Sensor terhubung. Silakan isi data.");
+      } else {
+        setIdFingerprint("");
+        setStatus("Menunggu data baru dari sensor fingerprint...");
+      }
+    }, (error) => {
+        console.error("Database read error:", error);
+        setStatus(`❌ Gagal membaca data sensor: ${error.code}`);
+    });
 
-        const idRef = ref(database, "tambah_fingerprint");
-        unsubscribeFromDb = onValue(idRef, (snapshot) => {
-          const data = snapshot.val();
-          if (!data || !data.timestamp) {
-            setIdFingerprint("");
-            return;
-          }
-
-          const now = new Date();
-          const fingerprintTime = new Date(data.timestamp);
-          const timeDiffMinutes = (now.getTime() - fingerprintTime.getTime()) / 1000 / 60;
-
-          if (timeDiffMinutes <= 5) {
-            setIdFingerprint(data.id?.toString() || "");
-          } else {
-            setIdFingerprint("");
-          }
-        }, (error) => {
-            // Handle potential errors from the database listener itself
-            console.error("Database read error:", error);
-            setStatus("❌ Gagal membaca data dari sensor.");
-        });
-      })
-      .catch((error) => {
-        // Handle errors during anonymous sign-in
-        console.error("Anonymous sign-in failed:", error);
-        setStatus("❌ Gagal melakukan otentikasi ke database.");
-      });
-
-    // 4. Return the cleanup function
-    // This will be executed when the component is unmounted to prevent memory leaks
+    // Cleanup function saat komponen di-unmount
     return () => {
       unsubscribeFromDb();
     };
-  }, []); // The empty dependency array ensures this effect runs only once on mount
+  }, []); // Dependency array kosong, berjalan sekali saat mount
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -71,11 +55,12 @@ export default function Adder() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!idFingerprint) {
       setStatus("❌ ID belum tersedia dari sensor fingerprint.");
       return;
     }
+    setIsSubmitting(true);
+    setStatus("Menyimpan data...");
 
     try {
       const res = await fetch("/api/tambah-user", {
@@ -92,17 +77,19 @@ export default function Adder() {
 
       if (!res.ok) {
         setStatus(`❌ ${result.error || "Gagal menyimpan data."}`);
-        return;
+      } else {
+        setStatus("✅ Data berhasil ditambahkan!");
+        setForm({ nama: "", jabatan: "" });
       }
-
-      setStatus("✅ Data berhasil ditambahkan!");
-      setForm({ nama: "", jabatan: "" });
     } catch (err) {
-      console.error("Gagal tambah data:", err);
-      setStatus("❌ Gagal menyimpan data.");
+      console.error("Fetch error:", err);
+      setStatus("❌ Gagal terhubung ke server.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // ... JSX (return statement) tidak perlu diubah, bisa gunakan yang dari sebelumnya
   return (
     <main className="min-h-screen bg-white px-6 py-12 text-black">
       <h1 className="text-3xl font-bold text-emerald-500 mb-8">
@@ -119,7 +106,7 @@ export default function Adder() {
             value={idFingerprint}
             readOnly
             required
-            placeholder={!idFingerprint ? "Menunggu data dari sensor..." : ""}
+            placeholder="Menunggu..."
             className="w-full px-4 py-2 border border-gray-300 bg-gray-100 rounded-md text-gray-800"
           />
         </div>
@@ -151,25 +138,26 @@ export default function Adder() {
           >
             <option value="">Pilih jabatan</option>
             <option value="Staff">Staff</option>
-            <option value="Kepala Dinas">Kepala Desa</option>
+            <option value="Kepala Desa">Kepala Desa</option>
           </select>
         </div>
 
         <div className="pt-4">
           <button
             type="submit"
-            className="w-full py-3 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition font-semibold"
+            disabled={isSubmitting || !idFingerprint}
+            className="w-full py-3 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Simpan Data
+            {isSubmitting ? "Menyimpan..." : "Simpan Data"}
           </button>
         </div>
 
         {status && (
           <div
-            className={`text-sm font-medium mt-2 ${
-              status.startsWith("✅")
-                ? "text-emerald-600"
-                : "text-red-600"
+            className={`text-center text-sm font-medium mt-4 p-3 rounded-md ${
+              status.startsWith("✅") ? "bg-emerald-100 text-emerald-800"
+              : status.startsWith("❌") ? "bg-red-100 text-red-800"
+              : "bg-blue-100 text-blue-800"
             }`}
           >
             {status}
