@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { database } from "../lib/firebase";
+// Import 'getAuth' and 'signInAnonymously' from the Firebase Auth SDK
+import { getAuth, signInAnonymously } from "firebase/auth";
+import { database } from "../lib/firebase"; // Your existing firebase initialization
 import { ref, onValue } from "firebase/database";
 
 export default function Adder() {
@@ -10,30 +12,57 @@ export default function Adder() {
     nama: "",
     jabatan: "",
   });
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("Menghubungkan ke database..."); // Initial status
 
   useEffect(() => {
-    const idRef = ref(database, "tambah_fingerprint");
-    const unsubscribe = onValue(idRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data || !data.timestamp) {
-        setIdFingerprint("");
-        return;
-      }
+    // This function will be called to clean up the listener when the component unmounts
+    let unsubscribeFromDb = () => {};
 
-      const now = new Date();
-      const fingerprintTime = new Date(data.timestamp);
-      const timeDiffMinutes = (now - fingerprintTime) / 1000 / 60;
+    // 1. Get the Firebase Auth instance
+    const auth = getAuth();
 
-      if (timeDiffMinutes <= 5) {
-        setIdFingerprint(data.id?.toString() || "");
-      } else {
-        setIdFingerprint("");
-      }
-    });
+    // 2. Sign in the user anonymously
+    signInAnonymously(auth)
+      .then(() => {
+        // 3. Once signed in, set up the Realtime Database listener
+        console.log("User signed in anonymously.");
+        setStatus(""); // Clear connecting status
 
-    return () => unsubscribe();
-  }, []);
+        const idRef = ref(database, "tambah_fingerprint");
+        unsubscribeFromDb = onValue(idRef, (snapshot) => {
+          const data = snapshot.val();
+          if (!data || !data.timestamp) {
+            setIdFingerprint("");
+            return;
+          }
+
+          const now = new Date();
+          const fingerprintTime = new Date(data.timestamp);
+          const timeDiffMinutes = (now.getTime() - fingerprintTime.getTime()) / 1000 / 60;
+
+          if (timeDiffMinutes <= 5) {
+            setIdFingerprint(data.id?.toString() || "");
+          } else {
+            setIdFingerprint("");
+          }
+        }, (error) => {
+            // Handle potential errors from the database listener itself
+            console.error("Database read error:", error);
+            setStatus("❌ Gagal membaca data dari sensor.");
+        });
+      })
+      .catch((error) => {
+        // Handle errors during anonymous sign-in
+        console.error("Anonymous sign-in failed:", error);
+        setStatus("❌ Gagal melakukan otentikasi ke database.");
+      });
+
+    // 4. Return the cleanup function
+    // This will be executed when the component is unmounted to prevent memory leaks
+    return () => {
+      unsubscribeFromDb();
+    };
+  }, []); // The empty dependency array ensures this effect runs only once on mount
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -90,6 +119,7 @@ export default function Adder() {
             value={idFingerprint}
             readOnly
             required
+            placeholder={!idFingerprint ? "Menunggu data dari sensor..." : ""}
             className="w-full px-4 py-2 border border-gray-300 bg-gray-100 rounded-md text-gray-800"
           />
         </div>
