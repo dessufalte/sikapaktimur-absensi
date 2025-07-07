@@ -314,18 +314,31 @@ export default function View() {
                     minute: "2-digit",
                   }) ?? "-";
 
-                const jamPulang =
-                  item.timehome && item.timehome.toDate
-                    ? item.timehome.toDate().toLocaleTimeString("id-ID", {
+                const jamPulang = (() => {
+                  const waktu = item.timehome;
+
+                  if (!waktu) return "-";
+
+                  // Jika objek memiliki method toDate() → diasumsikan Timestamp Firebase
+                  if (typeof waktu.toDate === "function") {
+                    const date = waktu.toDate();
+                    return isNaN(date)
+                      ? "-"
+                      : date.toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                  }
+
+                  // Jika string atau number → parsing dengan new Date
+                  const date = new Date(waktu);
+                  return isNaN(date)
+                    ? "-"
+                    : date.toLocaleTimeString("id-ID", {
                         hour: "2-digit",
                         minute: "2-digit",
-                      })
-                    : item.timehome
-                    ? new Date(item.timehome).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "-";
+                      });
+                })();
 
                 const lateText = (() => {
                   if (!jam) return "-";
